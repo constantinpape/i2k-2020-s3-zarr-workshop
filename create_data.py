@@ -1,6 +1,7 @@
 import json
 import os
 
+import zarr
 import z5py
 from data_conversion import convert_bdv_n5
 from pybdv.metadata import (get_size, get_resolution,
@@ -11,6 +12,32 @@ from mobie.xml_utils import copy_xml_as_n5_s3
 from mobie.metadata.image_dict import default_layer_setting
 
 IMAGE_DICT = './data/images.json'
+
+
+def write_trafo_to_zarr(xml, in_path):
+
+    resolution = get_resolution(xml, setup_id=0)[::-1]
+    print(resolution)
+
+    transform = {
+        'axes': ['x', 'y', 'z'],
+        'scale': resolution,
+        'translate': [0., 0., 0.],
+        'units': 3 * ['micrometer']
+    }
+
+    pixel_res = {
+        'dimensions': resolution,
+        'unit': 'micrometer'
+    }
+
+    with zarr.open(in_path) as f:
+        mscale = f.attrs['multiscales']
+        mscale[0].update({
+            'transform': transform,
+            'pixelResolution': pixel_res
+        })
+        f.attrs['multiscales'] = mscale
 
 
 def write_metadata(in_xml, out_xml, out_path):
@@ -116,5 +143,15 @@ def add_all_volumes():
     add_seg()
 
 
+def update_meta():
+    write_trafo_to_zarr('./data/em-cells.xml',
+                        './data/em-cells.ome.zarr')
+    write_trafo_to_zarr('./data/em-raw.xml',
+                        './data/em-raw.ome.zarr')
+    write_trafo_to_zarr('./data/prospr-myosin.xml',
+                        './data/prospr-myosin.ome.zarr')
+
+
 if __name__ == '__main__':
-    add_all_volumes()
+    update_meta()
+    # add_all_volumes()
